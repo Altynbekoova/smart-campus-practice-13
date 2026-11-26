@@ -132,15 +132,15 @@ function Practice12() {
         {/* Result */}
         {result && (
           <section className={`rounded-2xl border p-5 transition-all duration-300 ${codeStyles[result.code]}`}>
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 min-w-0">
               {result.available ? (
                 <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
               ) : (
                 <XCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
               )}
-              <div>
+              <div className="min-w-0">
                 <p className="font-bold text-lg">{result.available ? 'Available' : 'Unavailable'}</p>
-                <p className="text-xs font-mono mt-0.5 opacity-80">
+                <p className="text-xs font-mono mt-0.5 opacity-80 break-all [overflow-wrap:anywhere] min-w-0">
                   available: {String(result.available)} · code: {result.code}
                 </p>
                 <p className="text-sm mt-1">
@@ -162,49 +162,57 @@ function Practice12() {
               <li
                 key={c.id}
                 className={[
-                  'flex items-center justify-between rounded-lg px-4 py-2.5 border text-sm',
+                  'rounded-lg px-4 py-2.5 border text-sm min-w-0',
                   c.pass ? 'border-emerald-100 bg-emerald-50' : 'border-red-200 bg-red-50',
                 ].join(' ')}
               >
-                <span className="text-slate-700">
-                  {c.label}
-                  <span className="block text-xs text-slate-400 font-mono">
-                    expected {c.expected.available ? 'available' : 'unavailable'} / {c.expected.code}
-                  </span>
-                </span>
-                <span className="flex items-center gap-2 font-mono text-xs text-right">
-                  <span>
-                    observed {c.result.available ? 'available' : 'unavailable'} / {c.result.code}
-                  </span>
-                  <span
-                    className={[
-                      'px-1.5 py-0.5 rounded font-bold',
-                      c.pass ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white',
-                    ].join(' ')}
-                  >
-                    {c.pass ? 'PASS' : 'FAIL'}
-                  </span>
-                </span>
+                <div className="flex flex-col gap-1 min-w-0 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <span className="text-slate-700">{c.label}</span>
+                    <span className="block text-xs text-slate-400 font-mono break-all [overflow-wrap:anywhere]">
+                      expected {c.expected.available ? 'available' : 'unavailable'} / {c.expected.code}
+                    </span>
+                  </div>
+                  <div className="flex items-start md:items-center gap-2 font-mono text-xs md:shrink-0 min-w-0">
+                    <span className="break-all [overflow-wrap:anywhere] min-w-0">
+                      observed {c.result.available ? 'available' : 'unavailable'} / {c.result.code}
+                    </span>
+                    <span
+                      className={[
+                        'px-1.5 py-0.5 rounded font-bold shrink-0',
+                        c.pass ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white',
+                      ].join(' ')}
+                    >
+                      {c.pass ? 'PASS' : 'FAIL'}
+                    </span>
+                  </div>
+                </div>
               </li>
             ))}
             <li
               className={[
-                'flex items-center justify-between rounded-lg px-4 py-2.5 border text-sm',
+                'rounded-lg px-4 py-2.5 border text-sm min-w-0',
                 fixtureOk ? 'border-emerald-100 bg-emerald-50' : 'border-red-200 bg-red-50',
               ].join(' ')}
             >
-              <span className="text-slate-700">
-                Fixture unchanged after all checks
-                <span className="block text-xs text-slate-400 font-mono">expected unchanged / observed {fixtureOk ? 'unchanged' : 'modified'}</span>
-              </span>
-              <span
-                className={[
-                  'px-1.5 py-0.5 rounded font-bold text-xs',
-                  fixtureOk ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white',
-                ].join(' ')}
-              >
-                {fixtureOk ? 'PASS' : 'FAIL'}
-              </span>
+              <div className="flex flex-col gap-1 min-w-0 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <span className="text-slate-700">Fixture unchanged after all checks</span>
+                  <span className="block text-xs text-slate-400 font-mono break-all [overflow-wrap:anywhere]">
+                    expected unchanged / observed {fixtureOk ? 'unchanged' : 'modified'}
+                  </span>
+                </div>
+                <div className="flex md:justify-end min-w-0">
+                  <span
+                    className={[
+                      'px-1.5 py-0.5 rounded font-bold text-xs shrink-0',
+                      fixtureOk ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white',
+                    ].join(' ')}
+                  >
+                    {fixtureOk ? 'PASS' : 'FAIL'}
+                  </span>
+                </div>
+              </div>
             </li>
           </ul>
         </section>
