@@ -1,0 +1,228 @@
+[
+  {
+    "id": "campus13",
+    "type": "tab",
+    "label": "Practice 13 | Smart Campus",
+    "disabled": false,
+    "info": "Engineering Lab A. Live checks use Asia/Almaty. The test endpoint pins the clock at 10:00."
+  },
+  {
+    "id": "web",
+    "type": "http in",
+    "z": "campus13",
+    "name": "Browser form",
+    "x": 105,
+    "y": 100,
+    "wires": [
+      [
+        "live"
+      ]
+    ],
+    "url": "/campus",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "test",
+    "type": "http in",
+    "z": "campus13",
+    "name": "Acceptance test input",
+    "x": 130,
+    "y": 180,
+    "wires": [
+      [
+        "testClock"
+      ]
+    ],
+    "url": "/campus/test",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "live",
+    "type": "change",
+    "z": "campus13",
+    "name": "Read form \u00b7 real clock",
+    "x": 329,
+    "y": 100,
+    "wires": [
+      [
+        "fixtures"
+      ]
+    ],
+    "rules": [
+      {
+        "t": "set",
+        "p": "request",
+        "pt": "msg",
+        "to": "(\n$q := req.query;\n$start := $type($q.start)=\"string\" ? $q.start : \"\";\n$duration := $type($q.duration)=\"string\" ? $q.duration : \"\";\n$valid := $exists($match($start,/^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]$/));\n$stamp := $valid ? $toMillis($start & \":00+05:00\") : 0;\n$valid := $valid and $substring($fromMillis($stamp,\"[Y0001]-[M01]-[D01]T[H01]:[m01]\",\"+0500\"),0,16)=$start;\n{\n  \"requested\": $exists($q.start),\n  \"start\": $start,\n  \"duration\": $duration,\n  \"blocked\": $q.blocked = \"true\",\n  \"startMinute\": $valid ? $number($substring($start,11,2))*60+$number($substring($start,14,2)) : -1,\n  \"endMinute\": $valid and $exists($match($duration,/^-?\\d{1,8}$/)) ?\n      $number($substring($start,11,2))*60+$number($substring($start,14,2))+$number($duration) : -1,\n  \"future\": $valid and $stamp > $millis()\n}\n)",
+        "tot": "jsonata"
+      },
+      {
+        "t": "set",
+        "p": "responseFormat",
+        "pt": "msg",
+        "to": "html",
+        "tot": "str"
+      }
+    ]
+  },
+  {
+    "id": "testClock",
+    "type": "change",
+    "z": "campus13",
+    "name": "Pin test clock at 10:00",
+    "x": 329,
+    "y": 180,
+    "wires": [
+      [
+        "fixtures"
+      ]
+    ],
+    "rules": [
+      {
+        "t": "set",
+        "p": "request",
+        "pt": "msg",
+        "to": "(\n$p := payload;\n{\"requested\":true,\"startMinute\":$p.start,\"endMinute\":$p.end,\n \"blocked\":$p.blocked=true,\"future\":$p.start>600}\n)",
+        "tot": "jsonata"
+      },
+      {
+        "t": "set",
+        "p": "responseFormat",
+        "pt": "msg",
+        "to": "json",
+        "tot": "str"
+      }
+    ]
+  },
+  {
+    "id": "fixtures",
+    "type": "change",
+    "z": "campus13",
+    "name": "Daily bookings",
+    "x": 540,
+    "y": 140,
+    "wires": [
+      [
+        "policy"
+      ]
+    ],
+    "rules": [
+      {
+        "t": "set",
+        "p": "bookings",
+        "pt": "msg",
+        "to": "[{\"start\": 540, \"end\": 600}, {\"start\": 780, \"end\": 840}]",
+        "tot": "json"
+      }
+    ]
+  },
+  {
+    "id": "policy",
+    "type": "change",
+    "z": "campus13",
+    "name": "Availability rules",
+    "x": 730,
+    "y": 140,
+    "wires": [
+      [
+        "switch"
+      ]
+    ],
+    "rules": [
+      {
+        "t": "set",
+        "p": "result",
+        "pt": "msg",
+        "to": "(\n$r := request;\n$start := $r.startMinute;\n$end := $r.endMinute;\n$code := $type($start)!=\"number\" or $type($end)!=\"number\" or $start<0 or $end>1440 or $start >= $end ? \"INVALID_INPUT\" :\n    $not($r.future) ? \"START_NOT_IN_FUTURE\" :\n    $end-$start>120 ? \"EXCEEDS_MAX_DURATION\" :\n    $r.blocked ? \"ROOM_BLOCKED\" :\n    $count(bookings[$start < end and $end > start]) > 0 ? \"OVERLAPS_EXISTING_BOOKING\" : \"AVAILABLE\";\n$messages := {\n  \"AVAILABLE\":\"Engineering Lab A is free for the requested interval.\",\n  \"INVALID_INPUT\":\"Enter a valid date and a whole-minute duration. The booking must end by midnight.\",\n  \"START_NOT_IN_FUTURE\":\"The start time must be in the future.\",\n  \"EXCEEDS_MAX_DURATION\":\"Bookings cannot exceed 120 minutes.\",\n  \"ROOM_BLOCKED\":\"Engineering Lab A is blocked.\",\n  \"OVERLAPS_EXISTING_BOOKING\":\"The requested interval overlaps an existing booking.\"\n};\n$r.requested ? {\n  \"available\": $code = \"AVAILABLE\",\n  \"code\": $code,\n  \"decision\": $code = \"AVAILABLE\" ? \"Available\" : \"Unavailable\",\n  \"message\": $lookup($messages,$code)\n}\n)",
+        "tot": "jsonata"
+      }
+    ]
+  },
+  {
+    "id": "switch",
+    "z": "campus13",
+    "type": "switch",
+    "name": "HTML or JSON?",
+    "property": "responseFormat",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "html",
+        "vt": "str"
+      },
+      {
+        "t": "else"
+      }
+    ],
+    "checkall": "false",
+    "repair": false,
+    "outputs": 2,
+    "x": 925,
+    "y": 140,
+    "wires": [
+      [
+        "html"
+      ],
+      [
+        "json"
+      ]
+    ]
+  },
+  {
+    "id": "html",
+    "type": "template",
+    "z": "campus13",
+    "name": "Render form and decision",
+    "x": 1140,
+    "y": 100,
+    "wires": [
+      [
+        "response"
+      ]
+    ],
+    "field": "payload",
+    "fieldType": "msg",
+    "format": "handlebars",
+    "syntax": "mustache",
+    "template": "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Smart Campus | Practice 13</title><style>\n*{box-sizing:border-box}body{margin:0;background:#eef4f3;color:#1a3532;font:16px system-ui}main{max-width:680px;margin:auto;padding:36px 18px}form,section{background:white;border:1px solid #c6d8d4;border-radius:14px;padding:22px;margin:18px 0}label{display:block;margin:12px 0}input:not([type=checkbox]){display:block;margin:6px 0;padding:9px;width:100%;font:inherit}button{background:#145c54;color:white;padding:10px 14px;border:0;border-radius:8px;font:inherit}h1{margin-bottom:0}\n</style><main><header><p>Practice #13 \u00b7 Low-code</p><h1>Room Availability</h1><p>Engineering Lab A \u00b7 Block C \u00b7 Asia/Almaty</p></header>\n<form action=\"/campus\" method=\"get\" novalidate>\n<label>Start date and time <input name=\"start\" type=\"datetime-local\" value=\"{{request.start}}\" required></label>\n<label>Duration (minutes) <input name=\"duration\" type=\"number\" min=\"1\" max=\"120\" step=\"1\" value=\"{{request.duration}}\" required></label>\n<label><input name=\"blocked\" type=\"checkbox\" value=\"true\" {{#request.blocked}}checked{{/request.blocked}}> Simulate a blocked room</label>\n<button>Check availability</button>\n</form>\n{{#result}}<section aria-live=\"polite\"><strong>{{decision}}</strong><p>available: {{available}} \u00b7 code: {{code}}</p><p>{{message}}</p></section>{{/result}}\n<section><strong>Existing daily bookings</strong><ul><li>09:00\u201310:00</li><li>13:00\u201314:00</li></ul></section></main></html>",
+    "output": "str"
+  },
+  {
+    "id": "json",
+    "type": "change",
+    "z": "campus13",
+    "name": "Return decision and fixtures",
+    "x": 1150,
+    "y": 180,
+    "wires": [
+      [
+        "response"
+      ]
+    ],
+    "rules": [
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "{\"result\":result,\"bookings\":bookings}",
+        "tot": "jsonata"
+      }
+    ]
+  },
+  {
+    "id": "response",
+    "type": "http response",
+    "z": "campus13",
+    "name": "Send response",
+    "x": 1360,
+    "y": 140,
+    "wires": [],
+    "statusCode": "",
+    "headers": {}
+  }
+]
