@@ -3,10 +3,9 @@ import { ArrowLeft, CheckCircle2, XCircle, FlaskConical, Clock, Lock, Unlock } f
 import {
   PRACTICE12_CASES,
   LAB_ROOM_NAME,
-  evaluate,
   getEngineeringLabA,
+  resolveLiveRequest,
   runCase,
-  withBlockedFlag,
 } from '../lib/practice12';
 import { fmt } from '../lib/validation';
 import type { Practice12Result } from '../lib/practice12';
@@ -26,10 +25,6 @@ function toLocalInputValue(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function minutesOfDay(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
-}
-
 function Practice12() {
   const [when, setWhen] = useState<string>(() => toLocalInputValue(new Date(Date.now() + 60 * 60 * 1000)));
   const [durationMin, setDurationMin] = useState(60);
@@ -37,21 +32,15 @@ function Practice12() {
 
   const room = useMemo(() => getEngineeringLabA(), []);
 
-  const durationValid = Number.isInteger(durationMin) && durationMin >= 1 && durationMin <= 120;
-  const whenValid = when !== '';
-  const start = whenValid ? minutesOfDay(new Date(when)) : NaN;
+  // One request: the full local timestamp decides, then the same-day room rule applies.
+  const live = useMemo(
+    () => resolveLiveRequest({ whenLocal: when, durationMin, blocked, now: new Date() }, room),
+    [when, durationMin, blocked, room]
+  );
+  const result = live.result;
 
-  // One request: single start, single derived end, checked and displayed identically.
-  const result: Practice12Result | null = useMemo(() => {
-    if (!whenValid || !durationValid || Number.isNaN(start)) return null;
-    const end = start + durationMin;
-    const now = minutesOfDay(new Date());
-    return evaluate(withBlockedFlag(room, blocked), start, end, now);
-  }, [room, blocked, whenValid, durationValid, start, durationMin]);
-
-  const shownStart = whenValid && !Number.isNaN(start) ? fmt(start) : '--:--';
-  const shownEnd =
-    whenValid && durationValid && !Number.isNaN(start) ? fmt(start + durationMin) : '--:--';
+  const shownStart = live.ok ? fmt(live.start) : '--:--';
+  const shownEnd = live.ok ? fmt(live.end) : '--:--';
 
   const panelCases = useMemo(() => PRACTICE12_CASES.map((c) => ({ ...c, ...runCase(c) })), []);
   const fixtureOk = useMemo(() => {
@@ -68,7 +57,7 @@ function Practice12() {
             <FlaskConical className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Practice 12 — Isolated View</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Practice #13 — Isolated View</h1>
             <p className="text-slate-400 text-sm mt-0.5">
               {LAB_ROOM_NAME} only. Real current time for the live check; fixed clock only in the panel below.
             </p>
@@ -81,7 +70,7 @@ function Practice12() {
           href="/?view=checker"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-600 hover:text-sky-800 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to room checker
+          <ArrowLeft className="w-4 h-4" /> Back from Practice #13 to room checker
         </a>
 
         {/* Inputs */}
@@ -135,11 +124,8 @@ function Practice12() {
               </button>
             </div>
           </div>
-          {!durationValid && (
-            <p className="mt-3 text-xs text-red-600 font-medium">Duration must be a whole number from 1 to 120.</p>
-          )}
-          {whenValid && Number.isNaN(start) && (
-            <p className="mt-3 text-xs text-red-600 font-medium">Enter a valid local date and time.</p>
+          {!live.ok && (
+            <p className="mt-3 text-xs text-red-600 font-medium">{live.result.message}</p>
           )}
         </section>
 

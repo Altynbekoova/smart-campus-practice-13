@@ -36,7 +36,7 @@ function matchRooms(rooms: Room[], attendeeText: string, equipment: string[]): R
 function App() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  if (view === 'practice12') {
+  if (view === 'practice12' || view === 'practice13') {
     return <Practice12 />;
   }
 
@@ -387,10 +387,10 @@ function Checker() {
 
       <footer className="text-center py-6 text-xs text-slate-400">
         <a
-          href="/?view=practice12"
+          href="/?view=practice13"
           className="inline-flex items-center gap-1 mr-4 text-sky-600 hover:text-sky-800 transition-colors"
         >
-          <FlaskConical className="w-3.5 h-3.5" /> Practice 12 view
+          <FlaskConical className="w-3.5 h-3.5" /> Practice #13 view
         </a>
         Fictional sample data for demonstration only.
       </footer>

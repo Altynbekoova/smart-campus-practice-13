@@ -4,6 +4,7 @@ import {
   evaluate,
   fixtureUnchanged,
   getEngineeringLabA,
+  resolveLiveRequest,
   runCase,
   withBlockedFlag,
   displayInterval,
@@ -13,6 +14,11 @@ import { SAMPLE_ROOMS } from '../data';
 
 // Fixed clock: 10:00. Shared expected cases with the in-app verification panel.
 const CURRENT = FIXED_CURRENT_MINUTES;
+
+function toLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 describe('Practice 12: shared eight-case verification', () => {
   it('runs every shared case and matches the expected availability and code', () => {
@@ -110,5 +116,66 @@ describe('Practice 12: shared eight-case verification', () => {
     const res = evaluate(room, 720, 780, CURRENT);
     expect(res.available).toBe(true);
     expect(displayInterval(720, 780)).toEqual({ start: '12:00', end: '13:00' });
+  });
+
+  it('rejects yesterday at a later clock hour (full timestamp, not minute-of-day)', () => {
+    const room = getEngineeringLabA();
+    const now = new Date(2026, 10, 26, 9, 0); // today 09:00
+    const yesterdayLaterHour = new Date(2026, 10, 25, 15, 0); // yesterday 15:00 > 09:00 by clock only
+    const out = resolveLiveRequest(
+      { whenLocal: toLocal(yesterdayLaterHour), durationMin: 60, blocked: false, now },
+      room
+    );
+    expect(out.ok).toBe(false);
+    expect(out.result.available).toBe(false);
+    expect(out.result.code).toBe('START_NOT_IN_FUTURE');
+  });
+
+  it('accepts tomorrow earlier than today’s clock hour (00:00 on a future day works)', () => {
+    const room = getEngineeringLabA();
+    const now = new Date(2026, 10, 26, 9, 0); // today 09:00
+    const tomorrowEarly = new Date(2026, 10, 27, 0, 0); // tomorrow 00:00, earlier clock time than now
+    const out = resolveLiveRequest(
+      { whenLocal: toLocal(tomorrowEarly), durationMin: 60, blocked: false, now },
+      room
+    );
+    expect(out.ok).toBe(true);
+    expect(out.result.available).toBe(true);
+    expect(out.result.code).toBe('AVAILABLE');
+    expect(out).toMatchObject({ start: 0, end: 60 });
+  });
+
+  it('rejects a start exactly at now (strictly future)', () => {
+    const room = getEngineeringLabA();
+    const now = new Date(2026, 10, 26, 9, 0);
+    const exactNow = new Date(2026, 10, 26, 9, 0);
+    const out = resolveLiveRequest(
+      { whenLocal: toLocal(exactNow), durationMin: 60, blocked: false, now },
+      room
+    );
+    expect(out.ok).toBe(false);
+    expect(out.result.code).toBe('START_NOT_IN_FUTURE');
+  });
+
+  it('applies the same-day overlap rule on a future day, not against today’s minute-of-day', () => {
+    const room = getEngineeringLabA();
+    const now = new Date(2026, 10, 26, 9, 0); // today 09:00
+    // Next week 13:30–14:30 overlaps the 13:00–14:00 booking on that day.
+    const futureOverlap = new Date(2026, 11, 3, 13, 30);
+    const out = resolveLiveRequest(
+      { whenLocal: toLocal(futureOverlap), durationMin: 60, blocked: false, now },
+      room
+    );
+    expect(out.ok).toBe(true);
+    expect(out.result.available).toBe(false);
+    expect(out.result.code).toBe('OVERLAPS_EXISTING_BOOKING');
+    // And a future-day slot earlier than today's clock time is not rejected by the past rule.
+    const futureEarly = new Date(2026, 11, 3, 8, 0); // 08:00, earlier than today's 09:00 clock time
+    const ok = resolveLiveRequest(
+      { whenLocal: toLocal(futureEarly), durationMin: 60, blocked: false, now },
+      room
+    );
+    expect(ok.result.available).toBe(true);
+    expect(ok.result.code).toBe('AVAILABLE');
   });
 });

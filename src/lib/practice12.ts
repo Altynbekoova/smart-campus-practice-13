@@ -92,6 +92,66 @@ export function displayInterval(start: number, end: number): { start: string; en
   return { start: fmt(start), end: fmt(end) };
 }
 
+function minutesOfDay(d: Date): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export interface LiveRequestInput {
+  whenLocal: string;
+  durationMin: number;
+  blocked: boolean;
+  now: Date;
+}
+
+export type LiveRequestOutcome =
+  | { ok: false; result: Practice12Result }
+  | { ok: true; result: Practice12Result; start: number; end: number };
+
+// Pure and clock-injected: the caller supplies `now`, so tests are deterministic.
+export function resolveLiveRequest(
+  input: LiveRequestInput,
+  room: Room
+): LiveRequestOutcome {
+  const { whenLocal, durationMin, blocked, now } = input;
+  if (!whenLocal || !Number.isInteger(durationMin) || durationMin < 1 || durationMin > 120) {
+    return {
+      ok: false,
+      result: { available: false, code: 'INVALID_INPUT', message: 'Provide a valid local start and a duration from 1 to 120 minutes.' },
+    };
+  }
+  const selected = new Date(whenLocal);
+  if (Number.isNaN(selected.getTime())) {
+    return {
+      ok: false,
+      result: { available: false, code: 'INVALID_INPUT', message: 'Enter a valid local date and time.' },
+    };
+  }
+  // Full local timestamp must be strictly after now; this is what rejects
+  // yesterday-at-a-later-hour, which a minute-of-day check alone would accept.
+  if (selected.getTime() <= now.getTime()) {
+    return {
+      ok: false,
+      result: { available: false, code: 'START_NOT_IN_FUTURE', message: 'Start time must be after the current time.' },
+    };
+  }
+  const start = minutesOfDay(selected);
+  const end = start + durationMin;
+  // Same-day requests keep the existing same-day rule (start vs current minute).
+  // Future days must not be compared against today's minute-of-day, so the
+  // past-time check is already satisfied by the timestamp check above (-1 sentinel).
+  const currentTime = dayKey(selected) === dayKey(now) ? minutesOfDay(now) : -1;
+  return {
+    ok: true,
+    start,
+    end,
+    result: evaluate(withBlockedFlag(room, blocked), start, end, currentTime),
+  };
+}
+
 export function fixtureUnchanged(): boolean {
   const snapshot = structuredClone(SAMPLE_ROOMS);
   PRACTICE12_CASES.forEach((c) => runCase(c));
